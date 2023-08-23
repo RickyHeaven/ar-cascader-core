@@ -1,6 +1,6 @@
 {
   "name": "ar-cascader",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "description": "administrative region cascader base on view-ui-plus, vue3 version",
   "type": "module",
   "files": [
