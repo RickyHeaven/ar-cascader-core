@@ -1,0 +1,11 @@
+public/
+.idea/
+.git/
+
+
+gulpfile.js
+*.map
+index.html
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
