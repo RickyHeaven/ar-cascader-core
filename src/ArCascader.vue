@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-	import { computed, onMounted, ref, watch } from 'vue'
-	import { pca, pcaa } from 'area-data'
+	import { computed } from 'vue'
+	import { find } from 'lodash-es'
+	import areaData from '@zhangqingcq/china-area-data'
 
 	const emit = defineEmits(['update:modelValue', 'on-change'])
 	const props = withDefaults(
@@ -24,176 +25,155 @@
 		}
 	)
 
-	const selectData = ref<any[]>([])
-	const select = ref<any[]>([])
-	let oldData: any[] = []
-	const showLevel = computed(() => parseInt(String(props.level)))
-
-	function levelShow(level: number, code: string) {
-		if (level === 2) {
-			return Object.keys(pca['86']).indexOf(code) > -1
+	let oldValue: any[] = []
+	const amend = (d: number | string) => {
+		if (typeof d === 'number') {
+			d = d.toString()
 		}
-	}
-
-	function getIndex(list: Record<string, any>, name: string) {
-		for (const i in list) {
-			if (list[i] === name) {
-				return i
+		if (d.length < 12) {
+			const t = [...d]
+			while (t.length < 12) {
+				t.push('0')
 			}
+			return Number(t.join(''))
 		}
-		return ''
+		return Number(d)
 	}
-
-	function init() {
-		let proData: any[] = []
-		for (const p in pca['86']) {
-			let proItem: Record<string, any> = {
-				value: p,
-				label: pca['86'][p],
-				children: []
+	const select = computed({
+		get() {
+			let t = []
+			if (props.modelValue?.every?.((e) => /^[\u4e00-\u9fa5]+$/.test(e))) {
+				t = getValue(props.modelValue, 'label', 'value')
+			} else if (props.modelValue?.every?.((e) => /^\d+$/.test(e))) {
+				t = props.modelValue.map(amend)
+			} else if (props.modelValue?.every?.((e) => e?.hasOwnProperty('code'))) {
+				t = getValue(
+					props.modelValue.map((e) => ({
+						code: amend(e.code),
+						name: e.name
+					})),
+					'value',
+					'value',
+					'code'
+				)
+			} else if (props.modelValue?.every?.((e) => e?.hasOwnProperty('name'))) {
+				t = getValue(props.modelValue, 'label', 'value', 'name')
 			}
-			if (showLevel.value > 0 && pcaa[p]) {
-				proItem.loading = false
+			oldValue = t
+			return t
+		},
+		set(v) {
+			if (isSame(v)) {
+				return
 			}
-			proData.push(proItem)
-		}
-		selectData.value = proData
-	}
-
-	function setDefaultValue() {
-		if (props.modelValue[0]) {
-			let _select: any[] = []
-			if (isNaN(parseInt(props.modelValue[0]))) {
-				let i = 0
-				let index: string = ''
-				while (props.modelValue[i] && i <= showLevel.value) {
-					if (i === 0) {
-						index = getIndex(pca['86'], props.modelValue[0])
-					} else {
-						index = getIndex(pcaa[index], props.modelValue[i])
-					}
-					_select.push(index)
-					i++
-				}
-				select.value = _select
-			} else {
-				select.value = props.modelValue
-			}
-			let res = processValue(select.value)
-			oldData = res
-			emit('update:modelValue', res)
-			emit('on-change', res)
-		}
-	}
-
-	function canEmit(res: any[]) {
-		let ifEmit = false
-		if (props.modelValue && props.modelValue.length !== 0) {
-			if (typeof res[0] === 'string') {
-				if (props.modelValue[props.modelValue.length - 1] !== oldData[oldData.length - 1]) {
-					ifEmit = true
-				}
-			} else {
-				if (
-					oldData &&
-					oldData.length !== 0 &&
-					props.modelValue[props.modelValue.length - 1].code !== oldData[oldData.length - 1].code
-				) {
-					ifEmit = true
-				}
-			}
-		} else {
-			ifEmit = true
-		}
-		return ifEmit
-	}
-
-	function handleChange(resArr: any[]) {
-		let res = processValue(resArr)
-		oldData = res
-		emit('update:modelValue', res)
-		emit('on-change', res)
-	}
-
-	function loadData(item: Record<string, any>, callback: () => void) {
-		let childData = []
-		let children = pcaa[item.value]
-		for (const c in children) {
-			if (children.hasOwnProperty(c)) {
-				let child: Record<string, any> = {
-					value: c,
-					label: pcaa[item.value][c],
-					children: []
-				}
-				if (pcaa[child.value] && levelShow(showLevel.value, item.value)) {
-					child.loading = false
-				}
-				childData.push(child)
-				item.children = childData
-			}
-		}
-		item.loading = false
-		callback()
-	}
-
-	function processValue(arr: any[]) {
-		let i = 0
-		let res = []
-		while (arr[i]) {
-			let name = ''
-			if (i === 0) {
-				name = pca['86'][arr[i]]
-			} else {
-				name = pcaa[arr[i - 1]][arr[i]]
-			}
-			let item
+			let t = []
 			if (props.dataType === 'all') {
-				item = {
-					code: arr[i],
-					name: name
-				}
+				t = getValue(v, 'value', 'all')
+			} else if (props.dataType === 'code') {
+				t = v
 			} else if (props.dataType === 'name') {
-				item = name
-			} else {
-				item = arr[i]
+				t = getValue(v, 'value', 'label')
 			}
-			res.push(item)
-			i++
-		}
-		return res
-	}
-
-	onMounted(() => {
-		init()
-		if (canEmit(props.modelValue)) {
-			setDefaultValue()
+			emit('update:modelValue', t)
+			emit('on-change', t)
 		}
 	})
-
-	watch(
-		() => props.modelValue,
-		() => {
-			if (canEmit(props.modelValue)) {
-				setDefaultValue()
+	const selectData = computed(() => {
+		const t: Record<string, any>[] = []
+		areaData.forEach((e1: Record<string, any>) => {
+			const l1: Record<string, any> = {
+				label: e1.label,
+				value: e1.value
 			}
-		},
-		{
-			deep: true
+			if (Number(props.level) > 0) {
+				l1.children = []
+				e1.children.forEach((e2: Record<string, any>) => {
+					const l2: Record<string, any> = {
+						label: e2.label,
+						value: e2.value
+					}
+					if (Number(props.level) > 1) {
+						l2.children = []
+						e2.children.forEach((e3: Record<string, any>) => {
+							l2.children.push({
+								label: e3.label,
+								value: e3.value
+							})
+						})
+					}
+					l1.children.push(l2)
+				})
+			}
+			t.push(l1)
+		})
+		return t
+	})
+
+	function getValue(v: any[], key: string, type: string, source?: string) {
+		const t: any[] = []
+		let _v0: any, _v1: any, _v2: any
+		if (source) {
+			_v0 = v[0]?.[source]
+			_v1 = v[1]?.[source]
+			_v2 = v[2]?.[source]
+		} else {
+			_v0 = v[0]
+			_v1 = v[1]
+			_v2 = v[2]
 		}
-	)
+		const l1 = find(areaData, (_e) => _e[key] === _v0)
+		if (l1) {
+			setResult(t, l1, type)
+			if (props.level === 0 || _v1 === undefined) {
+				return t
+			}
+			const l2 = find(l1.children, (_e) => _e[key] === _v1)
+			if (l2) {
+				setResult(t, l2, type)
+				if (props.level === 1 || _v2 === undefined) {
+					return t
+				}
+				const l3 = find(l2.children, (_e) => _e[key] === _v2)
+				if (l3) {
+					setResult(t, l3, type)
+					return t
+				}
+			}
+		}
+		return []
+	}
+
+	function setResult(t: any[], v: Record<string, any>, type: string) {
+		if (type === 'label' || type === 'value') {
+			t.push(v[type])
+		} else {
+			t.push({
+				code: v.value,
+				name: v.label
+			})
+		}
+	}
+
+	function isSame(t: Array<number | string>) {
+		if (t?.length === 0) {
+			return oldValue?.length === 0
+		}
+		if (oldValue?.length === 0) {
+			return false
+		}
+		return t.every((e, i) => e === oldValue?.[i])
+	}
 </script>
 
 <template>
 	<Cascader
 		v-model="select"
 		:data="selectData"
-		:load-data="loadData"
-		transfer
 		:disabled="props.disabled"
 		:size="props.size"
 		:placeholder="props.placeholder"
 		:render-format="props.renderFormat"
 		:change-on-select="props.changeOnSelect"
-		@on-change="handleChange"
+		transfer
 	/>
 </template>

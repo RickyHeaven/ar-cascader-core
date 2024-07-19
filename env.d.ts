@@ -1,3 +1,3 @@
 /// <reference types="vite/client" />
 
-declare module 'area-data'
+declare module '@zhangqingcq/china-area-data'
