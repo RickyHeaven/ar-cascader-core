@@ -63,6 +63,7 @@
 			return t
 		},
 		set(v) {
+			v = v.map((e) => (typeof e === 'string' ? Number(e) : e))
 			if (isSame(v)) {
 				return
 			}
@@ -175,5 +176,6 @@
 		:render-format="props.renderFormat"
 		:change-on-select="props.changeOnSelect"
 		transfer
+		filterable
 	/>
 </template>
